@@ -1,0 +1,59 @@
+# Baut Tablet Home und veröffentlicht die APK als Release "latest".
+# Diese Datei gehört ins Repo nach .github/workflows/build.yml
+name: Tablet Home bauen
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "*.zip"
+      - ".github/workflows/build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Code holen
+        uses: actions/checkout@v4
+
+      - name: Java 17 einrichten
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Gradle 8.9 einrichten
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Android-SDK einrichten
+        uses: android-actions/setup-android@v3
+
+      - name: Android-Teile installieren
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Neueste ZIP-Datei auspacken
+        run: |
+          ZIP=$(ls -1 *.zip | sort -V | tail -n 1)
+          echo "Baue aus: $ZIP"
+          unzip -q "$ZIP" -d quellen
+
+      - name: APK bauen
+        working-directory: quellen/TabletHome
+        run: gradle assembleDebug --no-daemon
+
+      - name: APK als Release "latest" veröffentlichen
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Tablet Home (neueste Version)
+          files: quellen/TabletHome/app/build/outputs/apk/debug/app-debug.apk
+          overwrite_files: true
